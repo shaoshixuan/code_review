@@ -1,0 +1,47 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+logs/
+
+# Caches / generated artifacts
+**/cache/
+**/dataset_objs/
+**/output/*.npy
+**/*.pickle
+**/*.pkl
+
+# Model checkpoints / binaries
+**/*.pth
+**/*.pt
+**/*.bin
+**/*.model
+
+# Keep root user-approved dataset, but ignore duplicated embedded datasets and generated copies
+CMB/CDs/datasets/
+CPGRec/data/
+
+# Keep DRDW code and text results, but ignore generated cache data
+DRDW/data/
+
+# Optional noisy outputs
+CMB/CDs/output/best_action_delta.npy
+
+# Allow text results and source code explicitly
+!DRDW/output/*.txt
+!CMB/CDs/output/*.txt
+!CPGRec/output/*.txt

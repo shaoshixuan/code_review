@@ -1,0 +1,13 @@
+D-RDW Evaluation Results (GroceryFood Dataset)
+Data: /Users/shaoshixuan/Desktop/code_review/data
+Train file: /Users/shaoshixuan/Desktop/code_review/data/minimal/rec_train.txt
+Test file: /Users/shaoshixuan/Desktop/code_review/data/minimal/rec_test_candidate100.npz
+Total test samples: 145932
+MaxHops: 9, TargetSize: 20
+Mode: pure rdw_score ranking (no LP distribution sampling)
+Elapsed: 3197.9s
+
+@ 5: Recall=0.4887  NDCG=0.3829  CatCov=0.9836  ILD=0.9867  Novelty=9.3795
+@10: Recall=0.5955  NDCG=0.4174  CatCov=0.9924  ILD=0.9899  Novelty=9.7005
+@15: Recall=0.6601  NDCG=0.4345  CatCov=0.9967  ILD=0.9912  Novelty=9.9186
+@20: Recall=0.7087  NDCG=0.4460  CatCov=0.9978  ILD=0.9918  Novelty=10.0843

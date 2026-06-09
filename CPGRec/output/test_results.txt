@@ -1,0 +1,23 @@
+=== CPGRec Test Results (100-candidate) ===
+
+K=5:
+  Recall@5        = 0.0978
+  NDCG@5          = 0.0652
+  CatCov@5        = 0.0140
+  ILD@5           = 0.9637
+  Novelty@5       = 16.6087
+
+K=10:
+  Recall@10       = 0.1566
+  NDCG@10         = 0.0840
+  CatCov@10       = 0.0253
+  ILD@10          = 0.9636
+  Novelty@10      = 16.6156
+
+K=20:
+  Recall@20       = 0.2535
+  NDCG@20         = 0.1084
+  CatCov@20       = 0.0441
+  ILD@20          = 0.9635
+  Novelty@20      = 16.6222
+
