@@ -5,8 +5,8 @@
 # =============================================================================
 set -euo pipefail
 
-IEREC=/Users/shaoshixuan/Desktop/code_review/IERec
-LOG_DIR=/tmp/ierec_logs
+IEREC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LOG_DIR:-/tmp/ierec_logs}"
 mkdir -p "$LOG_DIR"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'

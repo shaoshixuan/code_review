@@ -8,8 +8,8 @@
 # =============================================================================
 set -euo pipefail
 
-REPO=/Users/shaoshixuan/Desktop/code_review
-LOG_DIR=/tmp/exp_logs
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LOG_DIR:-/tmp/exp_logs}"
 mkdir -p "$LOG_DIR"
 
 # 颜色输出

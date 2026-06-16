@@ -19,8 +19,8 @@
 # =============================================================================
 set -euo pipefail
 
-REPO=/Users/shaoshixuan/Desktop/code_review
-LOG_DIR=/tmp/exp_logs_v2
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LOG_DIR:-/tmp/exp_logs_v2}"
 mkdir -p "$LOG_DIR"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
