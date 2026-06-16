@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-ROOT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 
 
 def arg_parser_preprocessing_grocery():
@@ -9,16 +9,16 @@ def arg_parser_preprocessing_grocery():
     parser.add_argument("--dataset",
                         dest="dataset",
                         type=str,
-                        default="grocery_food")
+                        default="automotive")
     parser.add_argument("--data_dir",
                         dest="data_dir",
                         type=str,
-                        default=str(ROOT_DATA_DIR / "minimal"),
+                        default=str(DEFAULT_DATA_DIR.parent / "data_automotive" / "minimal"),
                         help="path to the minimal data directory")
     parser.add_argument("--kg_dir",
                         dest="kg_dir",
                         type=str,
-                        default=str(ROOT_DATA_DIR / "KG-related_Files"),
+                        default=str(DEFAULT_DATA_DIR.parent / "data_automotive" / "KG-related_Files"),
                         help="path to the KG files directory")
     parser.add_argument("--sample_ratio",
                         dest="sample_ratio",
@@ -43,7 +43,7 @@ def arg_parse_train_base_grocery():
     parser.add_argument("--dataset",
                         dest="dataset",
                         type=str,
-                        default="grocery_food")
+                        default="automotive")
     parser.add_argument("--gpu",
                         dest="gpu",
                         action="store_true",
@@ -87,7 +87,7 @@ def arg_parse_div_optimize_grocery():
     parser.add_argument("--dataset",
                         dest="dataset",
                         type=str,
-                        default="grocery_food")
+                        default="automotive")
     parser.add_argument("--base_model_path",
                         dest="base_model_path",
                         type=str,

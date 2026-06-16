@@ -1,0 +1,13 @@
+D-RDW Evaluation Results
+Data: /Users/shaoshixuan/Desktop/code_review/data_toys
+Train file: /Users/shaoshixuan/Desktop/code_review/data_toys/minimal/rec_train.txt
+Test file: /Users/shaoshixuan/Desktop/code_review/data_toys/minimal/rec_test_candidate100.npz
+Total test samples: 244141
+MaxHops: 9, TargetSize: 20
+Mode: pure rdw_score ranking (no LP distribution sampling)
+Elapsed: 6655.0s
+
+@ 5: Recall=0.5237  NDCG=0.4109  CatCov=0.9729  ILD=0.9664  Novelty=10.2567
+@10: Recall=0.6320  NDCG=0.4460  CatCov=0.9904  ILD=0.9723  Novelty=10.4544
+@15: Recall=0.6935  NDCG=0.4623  CatCov=0.9968  ILD=0.9742  Novelty=10.6079
+@20: Recall=0.7383  NDCG=0.4728  CatCov=1.0000  ILD=0.9751  Novelty=10.7367

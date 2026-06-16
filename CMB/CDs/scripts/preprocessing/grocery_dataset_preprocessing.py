@@ -16,6 +16,16 @@ import numpy as np
 from collections import defaultdict
 import random
 import os
+from pathlib import Path
+
+
+def _pick_first_existing(base_dir, patterns):
+    base_path = Path(base_dir)
+    for pattern in patterns:
+        matches = sorted(base_path.glob(pattern))
+        if matches:
+            return str(matches[0])
+    raise FileNotFoundError(f"No file matched patterns {patterns} under {base_dir}")
 
 
 class GroceryFoodDataset():
@@ -79,9 +89,18 @@ class GroceryFoodDataset():
         print(f"验证数据: {val_candidates.shape[0]} rows")
 
         print("=== 加载KG类别信息 ===")
+        entity_file = _pick_first_existing(
+            kg_dir,
+            ["kg_entities_*.txt", "kg_other_entities_*.txt"]
+        )
+        triple_file = _pick_first_existing(
+            kg_dir,
+            ["kg_other_triples_*.txt"]
+        )
+
         # 加载实体ID -> 名称映射
         entity_id_to_name = {}
-        with open(os.path.join(kg_dir, 'kg_entities_Grocery_and_Gourmet_Food.txt'), 'r') as f:
+        with open(entity_file, 'r') as f:
             for line in f:
                 parts = line.strip().split('\t')
                 if len(parts) >= 2:
@@ -97,7 +116,7 @@ class GroceryFoodDataset():
 
         # 从 kg_other_triples 提取 item -> category (relation 8 = has_category)
         item_raw_categories = defaultdict(list)
-        with open(os.path.join(kg_dir, 'kg_other_triples_Grocery_and_Gourmet_Food.txt'), 'r') as f:
+        with open(triple_file, 'r') as f:
             for line in f:
                 parts = line.strip().split('\t')
                 if len(parts) == 3:
@@ -144,7 +163,7 @@ class GroceryFoodDataset():
         # 构建topic列表和映射
         all_topics = set()
         for item_id in all_items_set:
-            cats = item_raw_categories.get(item_id, ['Grocery & Gourmet Food'])
+            cats = item_raw_categories.get(item_id, ['Unknown'])
             all_topics.update(cats)
 
         topic_list = sorted(all_topics)
@@ -155,7 +174,7 @@ class GroceryFoodDataset():
         item_topic_dict = {}
         for item_id in all_items_set:
             new_item_id = item_name_dict[item_id]
-            cats = item_raw_categories.get(item_id, ['Grocery & Gourmet Food'])
+            cats = item_raw_categories.get(item_id, ['Unknown'])
             item_topic_dict[new_item_id] = [topic_name_dict[c] for c in cats]
 
         # 构建user_topic_dict (user_id -> topic indices)

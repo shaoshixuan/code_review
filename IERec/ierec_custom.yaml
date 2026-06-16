@@ -1,0 +1,54 @@
+# IERec 在我们数据集上的配置（覆盖 overall.yaml 默认设置）
+# ─────────────────────────────────────────────────────────────────
+# 训练: CE loss（IERec 原始设计，对全量 item 做 softmax）
+# 早停: uni100 valid NDCG@10
+# 正式评估: eval_ierec_100cand.py（100-candidate, 5 项自定义指标）
+# ─────────────────────────────────────────────────────────────────
+
+# 数据路径
+data_path: 'dataset/'
+
+# 字段设置
+USER_ID_FIELD: user_id
+ITEM_ID_FIELD: item_id
+TIME_FIELD: timestamp
+
+# 明确加载 timestamp 字段
+load_col:
+  inter: [user_id, item_id, timestamp]
+
+# 序列推荐：Leave-one-out 分割
+eval_args:
+  split: {'LS': 'valid_and_test'}
+  group_by: user
+  order: TO       # Time Order: 按 timestamp 排序
+  mode: uni100    # 100 负样本 valid（用于早停，不是最终指标）
+
+# 过滤
+user_inter_num_interval: "[5, inf)"
+item_inter_num_interval: "[3, inf)"
+
+# 训练（CE loss，IERec 默认设计）
+epochs: 30
+train_batch_size: 1024
+learning_rate: 0.001
+eval_step: 10          # 每 10 epoch 评估一次（减少评估开销）
+stopping_step: 3       # 连续 3 次不提升则停止
+
+# 不使用训练负采样（CE loss 对全量 softmax）
+train_neg_sample_args: ~
+
+# IERec 模型参数（保持 CE loss 原始设计）
+loss_type: 'CE'
+
+# RecBole 内置评估指标（仅用于 early stopping）
+metrics: ["Recall", "NDCG"]
+topk: [10, 20]
+valid_metric: NDCG@10
+valid_metric_bigger: True
+metric_decimal_place: 4
+
+# 硬件
+use_gpu: false
+gpu_id: '0'
+worker: 0

@@ -35,8 +35,19 @@ logs/
 CMB/CDs/datasets/
 CPGRec/data/
 
+# Additional private/internal datasets must never be committed
+data_phones/
+
 # Keep DRDW code and text results, but ignore generated cache data
 DRDW/data/
+
+# IERec: keep source code only, ignore local repo metadata, datasets, logs, outputs and checkpoints
+IERec/.git/
+IERec/dataset/
+IERec/log/
+IERec/log_tensorboard/
+IERec/output/
+IERec/saved/
 
 # Optional noisy outputs
 CMB/CDs/output/best_action_delta.npy

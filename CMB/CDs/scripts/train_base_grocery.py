@@ -5,12 +5,15 @@ GroceryFood 数据集上训练CMB基础推荐模型
 import torch
 import numpy as np
 import os
+import sys
 import tqdm
 import pickle
 import argparse
 from pathlib import Path
 
-ROOT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 from torch.utils.data import DataLoader
 from scripts.preprocessing.dataset_init import dataset_init_grocery
 from models.data_loaders import UserItemInterDataset
@@ -28,9 +31,9 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description='Train CMB base model on GroceryFood dataset')
     # Preprocessing args
-    parser.add_argument("--dataset", type=str, default="grocery_food")
-    parser.add_argument("--data_dir", type=str, default=str(ROOT_DATA_DIR / "minimal"))
-    parser.add_argument("--kg_dir", type=str, default=str(ROOT_DATA_DIR / "KG-related_Files"))
+    parser.add_argument("--dataset", type=str, default="automotive")
+    parser.add_argument("--data_dir", type=str, default=str(DEFAULT_DATA_DIR.parent / "data_automotive" / "minimal"))
+    parser.add_argument("--kg_dir", type=str, default=str(DEFAULT_DATA_DIR.parent / "data_automotive" / "KG-related_Files"))
     parser.add_argument("--sample_ratio", type=int, default=3)
     parser.add_argument("--feature_dims", type=int, default=50)
     parser.add_argument("--save_path", type=str, default="./dataset_objs/")

@@ -24,6 +24,8 @@ import sys
 import time
 import math
 import pickle
+import argparse
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
@@ -38,17 +40,29 @@ from drdw.drdw_standalone import D_RDW
 # ============================================================
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(PROJECT_DIR)
-DATA_DIR = os.path.join(REPO_ROOT, "data")
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_dir', type=str, default=os.path.join(REPO_ROOT, 'data_automotive'))
+parser.add_argument('--output_tag', type=str, default='automotive')
+ARGS, _ = parser.parse_known_args()
+DATA_DIR = ARGS.data_dir
 MINIMAL_DIR = os.path.join(DATA_DIR, "minimal")
 KG_DIR = os.path.join(DATA_DIR, "KG-related_Files")
-OUTPUT_DIR = os.path.join(PROJECT_DIR, "output")
+OUTPUT_DIR = os.path.join(PROJECT_DIR, "output", ARGS.output_tag)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def _pick_first_existing(base_dir, patterns):
+    base_path = Path(base_dir)
+    for pattern in patterns:
+        matches = sorted(base_path.glob(pattern))
+        if matches:
+            return str(matches[0])
+    raise FileNotFoundError(f"No file matched patterns {patterns} under {base_dir}")
 
 TRAIN_FILE = os.path.join(MINIMAL_DIR, "rec_train.txt")
 TEST_FILE  = os.path.join(MINIMAL_DIR, "rec_test_candidate100.npz")
-KG_TRIPLES  = os.path.join(KG_DIR, "kg_other_triples_Grocery_and_Gourmet_Food.txt")
-KG_ENTITIES = os.path.join(KG_DIR, "kg_entities_Grocery_and_Gourmet_Food.txt")
-CACHE_FILE  = os.path.join(PROJECT_DIR, "data", "drdw_data.pkl")
+KG_TRIPLES  = _pick_first_existing(KG_DIR, ["kg_other_triples_*.txt"])
+KG_ENTITIES = _pick_first_existing(KG_DIR, ["kg_entities_*.txt", "kg_other_entities_*.txt"])
+CACHE_FILE  = os.path.join(PROJECT_DIR, "data", f"drdw_{ARGS.output_tag}_data.pkl")
 
 TARGET_SIZE = 20
 MAX_HOPS    = 9       # 9-hop random walk
@@ -335,7 +349,7 @@ def main():
 
     # --- Print and save ---
     result_lines = [
-        "D-RDW Evaluation Results (GroceryFood Dataset)\n",
+        "D-RDW Evaluation Results\n",
         f"Data: {DATA_DIR}\n",
         f"Train file: {TRAIN_FILE}\n",
         f"Test file: {TEST_FILE}\n",

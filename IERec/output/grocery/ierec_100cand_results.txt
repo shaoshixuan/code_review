@@ -1,0 +1,33 @@
+=== IERec 100-Candidate Evaluation (grocery) ===
+
+Model: saved/NEW-Jun-12-2026_17-15-58.pth
+Test rows: 145912
+
+K=5:
+  Recall@5   = 0.4019
+  NDCG@5   = 0.2959
+  CatCov@5   = 0.8202
+  ILD@5   = 0.8550
+  Novelty@5   = 8.9244
+
+K=10:
+  Recall@10  = 0.5202
+  NDCG@10  = 0.3341
+  CatCov@10  = 0.8999
+  ILD@10  = 0.8616
+  Novelty@10  = 9.3897
+
+K=15:
+  Recall@15  = 0.5922
+  NDCG@15  = 0.3532
+  CatCov@15  = 0.9408
+  ILD@15  = 0.8647
+  Novelty@15  = 9.6998
+
+K=20:
+  Recall@20  = 0.6438
+  NDCG@20  = 0.3654
+  CatCov@20  = 0.9559
+  ILD@20  = 0.8669
+  Novelty@20  = 9.9278
+

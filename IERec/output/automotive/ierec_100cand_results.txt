@@ -1,0 +1,33 @@
+=== IERec 100-Candidate Evaluation (automotive) ===
+
+Model: saved/NEW-Jun-15-2026_11-43-45.pth
+Test rows: 231591
+
+K=5:
+  Recall@5   = 0.3533
+  NDCG@5   = 0.2550
+  CatCov@5   = 0.7014
+  ILD@5   = 0.8572
+  Novelty@5   = 9.5547
+
+K=10:
+  Recall@10  = 0.4685
+  NDCG@10  = 0.2922
+  CatCov@10  = 0.7896
+  ILD@10  = 0.8443
+  Novelty@10  = 10.0177
+
+K=15:
+  Recall@15  = 0.5409
+  NDCG@15  = 0.3114
+  CatCov@15  = 0.8415
+  ILD@15  = 0.8330
+  Novelty@15  = 10.3205
+
+K=20:
+  Recall@20  = 0.5950
+  NDCG@20  = 0.3241
+  CatCov@20  = 0.8743
+  ILD@20  = 0.8228
+  Novelty@20  = 10.5425
+

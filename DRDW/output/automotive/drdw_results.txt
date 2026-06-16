@@ -1,0 +1,13 @@
+D-RDW Evaluation Results
+Data: /Users/shaoshixuan/Desktop/code_review/data_automotive
+Train file: /Users/shaoshixuan/Desktop/code_review/data_automotive/minimal/rec_train.txt
+Test file: /Users/shaoshixuan/Desktop/code_review/data_automotive/minimal/rec_test_candidate100.npz
+Total test samples: 231672
+MaxHops: 9, TargetSize: 20
+Mode: pure rdw_score ranking (no LP distribution sampling)
+Elapsed: 9068.1s
+
+@ 5: Recall=0.4529  NDCG=0.3494  CatCov=0.9777  ILD=0.9932  Novelty=10.1414
+@10: Recall=0.5631  NDCG=0.3850  CatCov=0.9932  ILD=0.9937  Novelty=10.4185
+@15: Recall=0.6322  NDCG=0.4033  CatCov=0.9981  ILD=0.9939  Novelty=10.6155
+@20: Recall=0.6818  NDCG=0.4150  CatCov=0.9988  ILD=0.9941  Novelty=10.7693

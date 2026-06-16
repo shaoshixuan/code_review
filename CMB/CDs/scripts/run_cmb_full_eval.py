@@ -23,7 +23,7 @@ from collections import defaultdict
 from time import time
 import datetime
 
-ROOT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.models import BaseRecModel, DivOptimizationModel
@@ -34,12 +34,13 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="grocery_food")
-    parser.add_argument("--data_obj_path", type=str, default="./dataset_objs/")
+    parser.add_argument("--data_dir", type=str, default=str(DEFAULT_DATA_DIR.parent / "data_automotive"),
+                        help="dataset root containing minimal/ and KG-related_Files/")
+    parser.add_argument("--dataset", type=str, default="automotive")
+    parser.add_argument("--data_obj_path", type=str, default="./dataset_objs_auto/")
     parser.add_argument("--base_model_path", type=str, default="./logs/")
     parser.add_argument("--base_model_file", type=str, default="best.base.model.pth")
-    parser.add_argument("--candidates_path", type=str,
-                        default=str(ROOT_DATA_DIR / "minimal" / "rec_test_candidate100.npz"))
+    parser.add_argument("--candidates_path", type=str, default=None)
     parser.add_argument("--gpu", action="store_true", default=False)
     parser.add_argument("--cuda", type=str, default='0')
     # CMB bandit 参数
@@ -223,26 +224,40 @@ def evaluate_on_candidates(base_model, item_delta_matrix, rec_dataset,
             idcg = sum(1.0 / math.log2(i + 2) for i in range(min(len(pos_set), k)))
             results[f'NDCG@{k}'].append(dcg / idcg if idcg > 0 else 0.0)
 
-            # CatCov@K
+            # CatCov@K (global collector)
             covered = set()
             for it in rec_k:
                 covered.update(item_topics_set.get(it, set()))
-            results[f'CatCov@{k}'].append(len(covered) / topic_num if topic_num > 0 else 0.0)
+            results[f'CatCovItems@{k}'].append(covered)
 
-            # ILD@K
+            # ILD@K (primary-category difference, aligned)
+            primary_topics = [sorted(item_topics_set.get(it, set()))[0] if item_topics_set.get(it, set()) else None for it in rec_k]
             n_pairs = k * (k - 1) / 2
             diff = sum(
                 1 for i in range(k) for j in range(i + 1, k)
-                if len(item_topics_set.get(rec_k[i], set()) &
-                       item_topics_set.get(rec_k[j], set())) == 0
+                if primary_topics[i] != primary_topics[j]
             )
             results[f'ILD@{k}'].append(diff / n_pairs if n_pairs > 0 else 0.0)
 
-            # Novelty@K
-            novs = [-math.log2(item_popularity.get(it, 1) / total_users) for it in rec_k]
+            # Novelty@K (-ln(pop / total_interactions), aligned)
+            total_interactions = sum(item_popularity.values())
+            novs = []
+            for it in rec_k:
+                pop = item_popularity.get(it, 1)
+                p = pop / total_interactions if total_interactions > 0 else 0.0
+                novs.append(-math.log(p) if p > 0 else 0.0)
             results[f'Novelty@{k}'].append(float(np.mean(novs)))
 
-    final = {k: float(np.mean(v)) for k, v in results.items()}
+    final = {}
+    for key, values in results.items():
+        if key.startswith('CatCovItems@'):
+            continue
+        final[key] = float(np.mean(values))
+    for k in k_list:
+        covered_global = set()
+        for covered in results[f'CatCovItems@{k}']:
+            covered_global.update(covered)
+        final[f'CatCov@{k}'] = len(covered_global) / topic_num if topic_num > 0 else 0.0
     return final
 
 
@@ -295,8 +310,9 @@ def main():
         print(f"action_delta 已保存: {delta_save_path}")
 
     # 加载 100 候选集（原始 ID）
-    print(f"\n加载 100 候选集: {args.candidates_path}")
-    candidates_raw = np.load(args.candidates_path, allow_pickle=True)['candidates']
+    candidates_path = args.candidates_path or os.path.join(args.data_dir, "minimal", "rec_test_candidate100.npz")
+    print(f"\n加载 100 候选集: {candidates_path}")
+    candidates_raw = np.load(candidates_path, allow_pickle=True)['candidates']
     print(f"候选集 shape: {candidates_raw.shape}")
 
     # item 流行度（new id -> 训练集交互次数）
@@ -328,7 +344,7 @@ def main():
         rows.append(f"{metric:<20}" + "".join(f"{v:>10.4f}" for v in vals))
 
     print("\n" + sep)
-    print("CMB 完整方法评估结果 (GroceryFood, 100候选集)")
+    print("CMB 完整方法评估结果")
     print(sep)
     print(header_line)
     print("-" * 60)
@@ -338,7 +354,7 @@ def main():
 
     # 保存
     with open(args.output, 'w') as f:
-        f.write(f"CMB 完整方法评估结果 (GroceryFood, 100候选集)\n")
+        f.write(f"CMB 完整方法评估结果\n")
         f.write(f"运行时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(sep + "\n")
         f.write(header_line + "\n")

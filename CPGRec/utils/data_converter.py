@@ -19,22 +19,41 @@ CPGRec需要的结构：
 import numpy as np
 from collections import defaultdict
 import os
+import sys
 import pickle
+import argparse
 import torch
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = PROJECT_ROOT / 'data'
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_dir', type=str, default=str(PROJECT_ROOT / 'data_automotive'))
+parser.add_argument('--output_tag', type=str, default='automotive')
+ARGS, _ = parser.parse_known_args()
+DATA_DIR = Path(ARGS.data_dir)
 KG_DIR = DATA_DIR / 'KG-related_Files'
 MINIMAL_DIR = DATA_DIR / 'minimal'
 CACHE_DIR = Path(__file__).resolve().parents[1] / 'data' / 'cache'
 os.makedirs(CACHE_DIR, exist_ok=True)
+CACHE_PATH = CACHE_DIR / f'cpgrec_{ARGS.output_tag}_data.pkl'
+GRAPH_PATH = CACHE_DIR / f'graph_user_item_{ARGS.output_tag}.bin'
+
+
+def _pick_first_existing(base_dir, patterns):
+    base_path = Path(base_dir)
+    for pattern in patterns:
+        matches = sorted(base_path.glob(pattern))
+        if matches:
+            return str(matches[0])
+    raise FileNotFoundError(f"No file matched patterns {patterns} under {base_dir}")
+
 
 
 def load_kg_entities():
     """加载KG实体ID到名称的映射"""
     entity_id_to_name = {}
-    with open(os.path.join(KG_DIR, 'kg_entities_Grocery_and_Gourmet_Food.txt'), 'r') as f:
+    entity_file = _pick_first_existing(KG_DIR, ['kg_entities_*.txt', 'kg_other_entities_*.txt'])
+    with open(entity_file, 'r') as f:
         for line in f:
             parts = line.strip().split('\t')
             if len(parts) >= 2:
@@ -45,7 +64,8 @@ def load_kg_entities():
 def load_kg_triples():
     """加载KG三元组"""
     triples = []
-    with open(os.path.join(KG_DIR, 'kg_other_triples_Grocery_and_Gourmet_Food.txt'), 'r') as f:
+    triple_file = _pick_first_existing(KG_DIR, ['kg_other_triples_*.txt'])
+    with open(triple_file, 'r') as f:
         for line in f:
             parts = line.strip().split('\t')
             if len(parts) == 3:
@@ -56,7 +76,8 @@ def load_kg_triples():
 def load_kg_items():
     """加载item ID列表"""
     items = {}
-    with open(os.path.join(KG_DIR, 'kg_items_Grocery_and_Gourmet_Food.txt'), 'r') as f:
+    item_file = _pick_first_existing(KG_DIR, ['kg_items_*.txt'])
+    with open(item_file, 'r') as f:
         for line in f:
             parts = line.strip().split('\t')
             if len(parts) >= 2:
@@ -67,7 +88,8 @@ def load_kg_items():
 def load_relations():
     """加载关系ID到名称的映射"""
     relations = {}
-    with open(os.path.join(KG_DIR, 'kg_relations_Grocery_and_Gourmet_Food.txt'), 'r') as f:
+    relation_file = _pick_first_existing(KG_DIR, ['kg_relations_*.txt'])
+    with open(relation_file, 'r') as f:
         for line in f:
             parts = line.strip().split('\t')
             if len(parts) >= 2:
@@ -253,8 +275,15 @@ def main():
 
     # 物品ID重映射: orig_id -> new_id (0-based)
     item_orig_to_new = {orig: new for new, orig in enumerate(all_item_orig)}
-    n_users = 57822  # user IDs already 0-57821
+    # 用户数从训练/测试候选中自动推断（用户ID已是 0-based 连续整数）
+    all_user_ids = set(u for u, i in train_interactions)
+    for row in test_cands:
+        all_user_ids.add(int(row[0]))
+    for row in val_cands:
+        all_user_ids.add(int(row[0]))
+    n_users = max(all_user_ids) + 1
     n_items = len(all_item_orig)
+    print(f"  自动推断 n_users={n_users}, n_items={n_items}")
 
     print(f"\n=== Step 2: 构建物品属性 ===")
     item_cat, item_brand, item_feat, cat_map, brand_map, feat_map = \
@@ -356,7 +385,7 @@ def main():
         'feat_map': feat_map,
     }
 
-    cache_path = os.path.join(CACHE_DIR, 'cpgrec_data.pkl')
+    cache_path = CACHE_PATH
     with open(cache_path, 'wb') as f:
         pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
     print(f"  数据已保存至: {cache_path}")
@@ -372,17 +401,19 @@ def main():
     graph.edges['play'].data['time'] = cache['train_weights']
     graph.edges['played_by'].data['time'] = cache['train_weights']
 
-    graph_path = os.path.join(CACHE_DIR, 'graph_user_item.bin')
-    dgl.save_graphs(graph_path, [graph])
+    graph_path = GRAPH_PATH
+    dgl.save_graphs(str(graph_path), [graph])
     print(f"  DGL图已保存至: {graph_path}")
     print(f"\n=== 完成! ===")
 
 
-def build_and_or_graphs_efficient(item_cat, item_brand, item_feat, item_orig_to_new):
+def build_and_or_graphs_efficient(item_cat, item_brand, item_feat, item_orig_to_new,
+                                   max_group_size=200):
     """
     高效构建AND/OR图 - 使用倒排索引避免O(n^2)
-    对于40694个物品，O(n^2)需要约8亿次比较，太慢
-    改为: 对每种属性，找到拥有该属性的物品集合，集合内两两连边
+    对于每种属性，找到拥有该属性的物品集合，集合内两两连边。
+    max_group_size: 某属性若包含的物品数超过此阈值，视为过于泛化，跳过连边，
+                    避免 O(n^2) 爆炸（Automotive 数据有 18k+ feature，单组可达数千物品）。
     """
     n_items = len(item_orig_to_new)
 
@@ -409,38 +440,31 @@ def build_and_or_graphs_efficient(item_cat, item_brand, item_feat, item_orig_to_
             for a in attrs:
                 feat_to_items[a].add(new_id)
 
-    # 构建item对之间的共享属性类型
-    # co_cat_brand: 同时共享category和brand
-    # co_cat_feat: 同时共享category和feature
-    # co_brand_feat: 同时共享brand和feature
-    # co_or: 共享任意一种
+    def collect_edges(attr_to_items):
+        """对每个属性组（大小 <= max_group_size），收集两两无向边对。"""
+        edge_set = set()
+        skipped = 0
+        for items in attr_to_items.values():
+            if len(items) > max_group_size:
+                skipped += 1
+                continue
+            items_list = sorted(items)
+            for i in range(len(items_list)):
+                for j in range(i + 1, len(items_list)):
+                    edge_set.add((items_list[i], items_list[j]))
+        return edge_set, skipped
 
-    # 先收集每种共享类型的边
-    cat_edges = set()  # (i, j) pairs sharing category
-    brand_edges = set()
-    feat_edges = set()
-
-    for items in cat_to_items.values():
-        items_list = sorted(items)
-        for i in range(len(items_list)):
-            for j in range(i + 1, len(items_list)):
-                cat_edges.add((items_list[i], items_list[j]))
-
-    for items in brand_to_items.values():
-        items_list = sorted(items)
-        for i in range(len(items_list)):
-            for j in range(i + 1, len(items_list)):
-                brand_edges.add((items_list[i], items_list[j]))
-
-    for items in feat_to_items.values():
-        items_list = sorted(items)
-        for i in range(len(items_list)):
-            for j in range(i + 1, len(items_list)):
-                feat_edges.add((items_list[i], items_list[j]))
+    print(f"  [图构建] max_group_size={max_group_size}")
+    cat_edges,   s1 = collect_edges(cat_to_items)
+    print(f"  cat_edges pairs: {len(cat_edges)}, skipped large groups: {s1}")
+    brand_edges, s2 = collect_edges(brand_to_items)
+    print(f"  brand_edges pairs: {len(brand_edges)}, skipped large groups: {s2}")
+    feat_edges,  s3 = collect_edges(feat_to_items)
+    print(f"  feat_edges pairs: {len(feat_edges)}, skipped large groups: {s3}")
 
     # AND edges
     co_cat_brand = cat_edges & brand_edges
-    co_cat_feat = cat_edges & feat_edges
+    co_cat_feat  = cat_edges & feat_edges
     co_brand_feat = brand_edges & feat_edges
     co_or = cat_edges | brand_edges | feat_edges
 
@@ -453,9 +477,9 @@ def build_and_or_graphs_efficient(item_cat, item_brand, item_feat, item_orig_to_
 
     return {
         'co_cat_brand': edges_to_tensors(co_cat_brand),
-        'co_cat_feat': edges_to_tensors(co_cat_feat),
+        'co_cat_feat':  edges_to_tensors(co_cat_feat),
         'co_brand_feat': edges_to_tensors(co_brand_feat),
-        'co_or': edges_to_tensors(co_or),
+        'co_or':        edges_to_tensors(co_or),
     }
 
 

@@ -8,6 +8,8 @@ import os
 import sys
 import pickle
 import time
+import math
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,10 +22,15 @@ from models.model import CPGRec
 
 # ============ Config ============
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(PROJECT_DIR, 'data')
-CACHE_DIR = os.path.join(DATA_DIR, 'cache')
-OUTPUT_DIR = os.path.join(PROJECT_DIR, 'output')
-LOG_DIR = os.path.join(PROJECT_DIR, 'logs')
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_dir', type=str, default=os.path.join(os.path.dirname(PROJECT_DIR), 'data_automotive'))
+parser.add_argument('--output_tag', type=str, default='automotive')
+ARGS, _ = parser.parse_known_args()
+DATA_DIR = ARGS.data_dir
+CACHE_DIR = os.path.join(PROJECT_DIR, 'data', 'cache')
+CACHE_FILE = os.path.join(CACHE_DIR, f'cpgrec_{ARGS.output_tag}_data.pkl')
+OUTPUT_DIR = os.path.join(PROJECT_DIR, 'output', ARGS.output_tag)
+LOG_DIR = os.path.join(PROJECT_DIR, 'logs', ARGS.output_tag)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -35,7 +42,8 @@ LR = 1e-3
 WEIGHT_DECAY = 1e-4
 REG_WEIGHT = 1e-4
 BATCH_SIZE = 2048
-N_EPOCHS = 30
+N_EPOCHS = 60          # 增加上限，配合早停
+EARLY_STOP_PATIENCE = 5  # 连续5次验证不提升则停止
 NEG_SAMPLES = 4
 TOPK_LIST = [5, 10, 20]
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -43,7 +51,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ============ Load Data ============
 def load_data():
-    cache_path = os.path.join(CACHE_DIR, 'cpgrec_data.pkl')
+    cache_path = CACHE_FILE
     print(f"Loading data from {cache_path} ...")
     with open(cache_path, 'rb') as f:
         data = pickle.load(f)
@@ -165,6 +173,7 @@ def compute_metrics(scores_matrix, labels, item_cat, item_pop, topk_list):
     for c_list in item_cat.values():
         all_cats_set.update(c_list)
     n_all_cats = max(len(all_cats_set), 1)
+    covered_global = {k: set() for k in topk_list}
 
     for k in topk_list:
         # Get top-k indices [n_users, k]
@@ -188,39 +197,35 @@ def compute_metrics(scores_matrix, labels, item_cat, item_pop, topk_list):
             # Category Coverage@K
             cats_in_topk = set()
             item_cats_list = []
+            primary_cats = []
             for item_idx in topk:
                 c = item_cat.get(item_idx, [])
                 item_cats_list.append(set(c))
                 cats_in_topk.update(c)
-            cat_covs[i] = len(cats_in_topk) / n_all_cats
+                primary_cats.append(c[0] if len(c) > 0 else None)
+            covered_global[k].update(cats_in_topk)
 
-            # ILD@K (vectorized over pairs)
+            # ILD@K (primary-category difference, aligned)
             if k > 1:
                 ild_sum = 0.0
                 cnt = 0
                 for a in range(k):
                     for b in range(a + 1, k):
-                        cats_a = item_cats_list[a]
-                        cats_b = item_cats_list[b]
-                        union = cats_a | cats_b
-                        if len(union) == 0:
-                            sim = 1.0
-                        else:
-                            sim = len(cats_a & cats_b) / len(union)
-                        ild_sum += (1.0 - sim)
+                        ild_sum += 1.0 if primary_cats[a] != primary_cats[b] else 0.0
                         cnt += 1
                 ilds[i] = ild_sum / cnt
 
-            # Novelty@K
+            # Novelty@K (-ln(pop/total_interactions), aligned)
             nov = 0.0
             for item_idx in topk:
-                pop = item_pop.get(item_idx, 1) / total_pop
-                nov -= np.log2(pop + 1e-10)
+                pop = item_pop.get(item_idx, 1)
+                p = pop / total_pop
+                nov += (-math.log(p) if p > 0 else 0.0)
             novelties[i] = nov / k
 
         results[f'Recall@{k}'] = np.mean(recalls)
         results[f'NDCG@{k}'] = np.mean(ndcgs)
-        results[f'CatCov@{k}'] = np.mean(cat_covs)
+        results[f'CatCov@{k}'] = len(covered_global[k]) / n_all_cats
         results[f'ILD@{k}'] = np.mean(ilds)
         results[f'Novelty@{k}'] = np.mean(novelties)
 
@@ -353,24 +358,22 @@ def train(data, ui_graph, and_graph, or_graph):
     log_lines = []
 
     print("\n=== Training CPGRec ===")
+    no_improve_count = 0  # 早停计数器
     for epoch in range(1, N_EPOCHS + 1):
         model.train()
         t0 = time.time()
         total_loss = 0.0
 
-        # Compute graph embeddings once per epoch (full-batch graph propagation)
-        # Detach to allow per-batch BPR loss backprop through base embeddings only
-        with torch.no_grad():
-            user_emb_graph, item_emb_graph = model.forward_graph_emb(
-                ui_graph_dev, and_graph_dev, or_graph_dev)
-
         for batch in loader:
             users, pos_items, neg_items = [x.to(DEVICE) for x in batch]
 
-            # Per-batch: use base embeddings for BPR so gradients flow to embedding tables
-            u_emb = model.user_emb(users)
-            p_emb = model.item_emb(pos_items)
-            n_emb = model.item_emb(neg_items)
+            # 端到端：graph embedding 参与梯度计算，让 GNN 层真正被优化
+            user_emb_all, item_emb_all = model.forward_graph_emb(
+                ui_graph_dev, and_graph_dev, or_graph_dev)
+
+            u_emb = user_emb_all[users]
+            p_emb = item_emb_all[pos_items]
+            n_emb = item_emb_all[neg_items]
 
             pos_scores = (u_emb * p_emb).sum(dim=-1)
             neg_scores = (u_emb * n_emb).sum(dim=-1)
@@ -385,12 +388,6 @@ def train(data, ui_graph, and_graph, or_graph):
             total_loss += loss.item()
 
         scheduler.step()
-
-        # Re-compute embeddings after optimizer step (for validation)
-        with torch.no_grad():
-            user_emb, item_emb = model.forward_graph_emb(
-                ui_graph_dev, and_graph_dev, or_graph_dev)
-
         elapsed = time.time() - t0
         avg_loss = total_loss / len(loader)
 
@@ -404,8 +401,15 @@ def train(data, ui_graph, and_graph, or_graph):
             if recall20 > best_recall:
                 best_recall = recall20
                 best_epoch = epoch
+                no_improve_count = 0
                 torch.save(model.state_dict(), best_model_path)
                 print(f"  -> Best model saved (val_Recall@20={best_recall:.4f})", flush=True)
+            else:
+                no_improve_count += 1
+                print(f"  -> No improvement ({no_improve_count}/{EARLY_STOP_PATIENCE})", flush=True)
+                if no_improve_count >= EARLY_STOP_PATIENCE:
+                    print(f"  -> Early stop triggered at epoch {epoch}", flush=True)
+                    break
         else:
             msg = f"Epoch {epoch:3d} | loss={avg_loss:.4f} | time={elapsed:.1f}s"
             print(msg, flush=True)
@@ -425,7 +429,7 @@ def train(data, ui_graph, and_graph, or_graph):
 
 # ============ Main ============
 def main():
-    print("=== CPGRec on GroceryFood Dataset ===", flush=True)
+    print(f"=== CPGRec on dataset: {os.path.basename(DATA_DIR)} ===", flush=True)
     print(f"Device: {DEVICE}", flush=True)
 
     # Load cache
@@ -452,7 +456,7 @@ def main():
     # Save results
     results_path = os.path.join(OUTPUT_DIR, 'test_results.txt')
     with open(results_path, 'w') as f:
-        f.write("=== CPGRec Test Results (100-candidate) ===\n\n")
+        f.write(f"=== CPGRec Test Results ({os.path.basename(DATA_DIR)}, 100-candidate) ===\n\n")
         for k in TOPK_LIST:
             f.write(f"K={k}:\n")
             for metric in ['Recall', 'NDCG', 'CatCov', 'ILD', 'Novelty']:

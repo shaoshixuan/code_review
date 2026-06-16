@@ -1,0 +1,33 @@
+=== IERec 100-Candidate Evaluation (toys) ===
+
+Model: saved/NEW-Jun-15-2026_19-39-38.pth
+Test rows: 244015
+
+K=5:
+  Recall@5   = 0.3483
+  NDCG@5   = 0.2442
+  CatCov@5   = 0.6563
+  ILD@5   = 0.9271
+  Novelty@5   = 9.6633
+
+K=10:
+  Recall@10  = 0.4712
+  NDCG@10  = 0.2839
+  CatCov@10  = 0.7118
+  ILD@10  = 0.9296
+  Novelty@10  = 10.0380
+
+K=15:
+  Recall@15  = 0.5502
+  NDCG@15  = 0.3048
+  CatCov@15  = 0.7483
+  ILD@15  = 0.9306
+  Novelty@15  = 10.2872
+
+K=20:
+  Recall@20  = 0.6087
+  NDCG@20  = 0.3186
+  CatCov@20  = 0.8011
+  ILD@20  = 0.9313
+  Novelty@20  = 10.4788
+

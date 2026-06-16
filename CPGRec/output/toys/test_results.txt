@@ -1,0 +1,23 @@
+=== CPGRec Test Results (data_toys, 100-candidate) ===
+
+K=5:
+  Recall@5        = 1.0000
+  NDCG@5          = 1.0000
+  CatCov@5        = 0.0149
+  ILD@5           = 1.0000
+  Novelty@5       = 11.4737
+
+K=10:
+  Recall@10       = 1.0000
+  NDCG@10         = 1.0000
+  CatCov@10       = 0.0217
+  ILD@10          = 0.9556
+  Novelty@10      = 11.8089
+
+K=20:
+  Recall@20       = 1.0000
+  NDCG@20         = 1.0000
+  CatCov@20       = 0.0392
+  ILD@20          = 0.9368
+  Novelty@20      = 11.6933
+
